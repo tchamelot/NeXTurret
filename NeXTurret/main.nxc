@@ -1,0 +1,183 @@
+/**
+ * Project:	NeXTurret
+ * File: 	main.nxc
+ * Autor: 	T. Chamelot
+ * Date:  	11/29/2016
+ */
+
+/**
+ * Brief: Command from master
+ * Structure: 3 byte
+ * Byte 0: H Byte 1: V Byte 3; shoot 
+ */
+byte cmd[3];
+mutex mut_cmd;
+
+/**
+ * Brief: Housekeeping 
+ * Structure: 4 bytes
+ * |H pos|V pos|bullet|battery|
+ *  byte3 byte2 byte1  byte0
+ */
+byte hk[4];
+mutex mut_hk;
+
+char v = 0;				//Vertical target
+char h = 0; 			//Horizontal target
+
+char i_left[3];		//Input for left motor
+char i_right[3];	//Input for rigth motor
+
+char o_left[2];		//Output from left motor
+char o_right[2];	//Output from Right motor
+
+char t_left;		//Target for left motor
+char t_right;		//Target for right motor
+
+char p_left;
+char p_right;
+
+byte bullets = 6;
+
+/**
+ * Brief:	Handle USB communication
+ */
+task comm()
+{
+	//init
+	string msg;
+	long ct;
+	long dt_cmd;
+	long dt_hk;
+	byte err;
+	
+	dt_cmd = CurrentTick();
+	dt_hk = dt_cmd;
+
+	TextOut(0, LCD_LINE1, "Start comm");
+
+	//comm loop
+	while(true)
+	{
+		ct = CurrentTick();
+		if((ct - dt_cmd) >= 20)
+		{
+			err = ReceiveMessage(MAILBOX1, true, msg);
+			if(err == 0 && StrLen(msg) >= 2)
+			{
+				h = StrIndex(msg, 0) - 1;
+				v = StrIndex(msg, 1) - 1;
+
+			}			
+			//NumOut(0, LCD_LINE2, h);
+			//NumOut(0, LCD_LINE3, v);
+			Acquire(mut_cmd);
+			t_left = (v+h)/2;
+			t_right = (v-h)/2;
+			Release(mut_cmd);
+			
+			dt_cmd = ct;
+		}
+
+		if((ct - dt_hk) >= 250)
+		{
+			Acquire(mut_hk);
+			hk[3] = MotorTachoCount(OUT_A);
+			hk[2] = MotorTachoCount(OUT_C);
+			hk[1] = bullets;
+			hk[0] = BatteryLevel();
+			msg = ByteArrayToStr(hk);
+			err = SendMessage(MAILBOX2, msg);
+			//handle error
+			Release(mut_hk);
+			dt_hk = ct;
+		}
+	}
+}
+
+task aim()
+{
+	//Init
+	long ct;
+	long pt;
+	long t;
+	i_left[2] = 0;
+	i_left[1] = 0;
+	i_right[2] = 0;
+	i_right[1] = 0;
+
+	o_left[1] = 0;
+	o_left[0] = 0;
+	o_right[1] = 0;
+	o_right[0] = 0;
+
+	ResetTachoCount(OUT_A);
+	ResetTachoCount(OUT_C);
+
+	pt = CurrentTick();
+	//Loop
+	while(true)
+	{
+		ct = CurrentTick();
+
+		if((ct - pt) >= 10)
+		{
+			pt = ct;
+			
+			Acquire(mut_cmd);
+			i_left[0] = t_left - MotorTachoCount(OUT_A);
+			i_right[0] = t_right - MotorTachoCount(OUT_C);
+			Release(mut_cmd);
+
+			p_left = 11.6227*i_left[2] - 26.3344*i_left[1] + 14.9039*i_left[0] - 0.4302*o_left[1] + 1.4302*o_left[0];
+			p_right = 11.6227*i_right[2] - 26.3344*i_right[1] + 14.9039*i_right[0] - 0.4302*o_right[1] + 1.4302*o_right[0];
+			
+			if(p_left > 100)
+				p_left = 100;
+
+			if(p_left < -100)
+				p_left = -100;
+
+			if(p_right > 100)
+				p_right = 100;
+
+			if(p_right < -100)
+				p_right = -100;
+
+			OnFwdEx(OUT_A, p_left, 0x00);
+			OnFwdEx(OUT_C, p_right, 0x00);
+
+			i_left[2] = i_left[1];
+			i_left[1] = i_left[0];
+			o_left[1] = o_left[0];
+			o_left[0] = p_left;
+		
+			i_right[2] = i_right[1];
+			i_right[1] = i_right[0];
+			o_right[1] = o_right[0];
+			o_right[0] = p_right;
+		}
+		//NumOut(0, LCD_LINE5, p_left);
+		//NumOut(0, LCD_LINE4, p_right);
+	}
+}
+
+task manager()
+{
+	//init
+
+
+	//manager loop
+	while(true)
+	{
+		if(ButtonPressed(BTNCENTER, false))
+			StopAllTasks();
+
+		Wait(MS_100);
+	}
+}
+
+task main()
+{
+ 	Precedes(manager, comm, aim);
+}
