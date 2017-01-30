@@ -1,0 +1,53 @@
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+*.d
+
+# Makefiles
+*.mk
+Release/makefile
+Debug/makefile
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+#*.so
+#*.dylib
+#*.dll
+
+# Compiled Static libraries
+#*.lai
+#*.la
+#*.a
+#*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+Release/Hexapode
+Debug/Hexapode
+
+# Target
+Debug/
+Release/
+
+# Eclipse Core
+.project
+
+# Eclipse setting files
+*.settings/
+.settings/language.settings.xml
+.settings/org.eclipse.cdt.core.prefs
+*.prefs
+.*
+!/.gitignore
+
+# CDT-specific
+.cproject
+
+.settings/org.eclipse.cdt.core.prefs
