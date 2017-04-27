@@ -6,101 +6,148 @@
  */
 
 /**
- * Brief: Command from master
- * Structure: 3 byte
- * Byte 0: H Byte 1: V Byte 3; shoot 
+ * Command variables from remote.
+ * The command is a 3 characters string.
+ * The first one is the horizontal target
+ * The second is the vertical target
+ * The third is the shoot order
  */
-byte cmd[3];
-mutex mut_cmd;
-
-/**
- * Brief: Housekeeping 
- * Structure: 4 bytes
- * |H pos|V pos|bullet|battery|
- *  byte3 byte2 byte1  byte0
- */
-byte hk[4];
-mutex mut_hk;
-
-char v = 0;				//Vertical target
-char h = 0; 			//Horizontal target
-
-char i_left[3];		//Input for left motor
-char i_right[3];	//Input for rigth motor
-
-char o_left[2];		//Output from left motor
-char o_right[2];	//Output from Right motor
-
+char v = 0;			//Vertical target
+char h = 0; 		//Horizontal target
+char shoot = 0;		//Shoot order
 char t_left;		//Target for left motor
 char t_right;		//Target for right motor
-
-char p_left;
-char p_right;
-
-byte bullets = 6;
+mutex mut_cmd;		//Command mutex
 
 /**
- * Brief:	Handle USB communication
+ * Housekeeping
+ * The housekeeping is a 4 bytes structure
+ */
+char hk[4];
+char bullets = 6;
+
+/**
+ * Function used to recalibrate the turret
+ */
+void calibrate()
+{
+	bool l_done = false;
+	bool r_done = false;
+
+	long pos = 0;
+
+	ResetTachoCount(OUT_A);
+	ResetTachoCount(OUT_C);
+
+	OnFwdEx(OUT_A, 30, 0x00);
+	do
+	{
+		pos = MotorTachoCount(OUT_A);
+		Wait(50);
+		pos -= MotorTachoCount(OUT_A);	
+	}while(pos != 0);
+	OnFwdEx(OUT_A, 0, 0x00);
+	ResetTachoCount(OUT_A);
+
+	OnFwdEx(OUT_C, 30, 0x00);
+	do
+	{
+		pos = MotorTachoCount(OUT_C);
+		Wait(50);
+		pos -= MotorTachoCount(OUT_C);	
+	}while(pos != 0);
+	OnFwdEx(OUT_C, 0, 0x00);
+	ResetTachoCount(OUT_C);
+
+	/*OnFwdEx(OUT_A, -20, 0x00);
+	while(MotorTachoCount(OUT_A) > -135)
+		Wait(10);
+	OnFwdEx(OUT_A, 0, 0x00);*/
+	RotateMotor(OUT_A, 40, -165);
+	ResetTachoCount(OUT_A);
+
+	/*OnFwdEx(OUT_C, -20, 0x00);
+	while(MotorTachoCount(OUT_C) > -135)
+		Wait(10);
+	OnFwdEx(OUT_C, 0, 0x00);*/
+	RotateMotor(OUT_C, 40, -165);
+	ResetTachoCount(OUT_C);
+}
+
+/**
+ * Task which handle communication with remote.
+ * Read the command from mailbox every 2Oms and store it into command variables
+ * Send the housekeeping to mailbox every 250ms
  */
 task comm()
 {
 	//init
-	string msg;
-	long ct;
-	long dt_cmd;
-	long dt_hk;
-	byte err;
+	long ct;		//Current tick
+	long pt_cmd;	//Previous tick for command
+	long pt_hk;		//Previous tick for housekeeping
+	string msg;		//String from the command mailbox
+	char err;		//Error handling variable
 	
-	dt_cmd = CurrentTick();
-	dt_hk = dt_cmd;
+	pt_cmd = CurrentTick();
+	pt_hk = pt_cmd;
 
-	TextOut(0, LCD_LINE1, "Start comm");
-
-	//comm loop
+	//loop
 	while(true)
 	{
 		ct = CurrentTick();
-		if((ct - dt_cmd) >= 20)
+		if((ct - pt_cmd) >= 20)
 		{
 			err = ReceiveMessage(MAILBOX1, true, msg);
-			if(err == 0 && StrLen(msg) >= 2)
+			if(err == 0 && StrLen(msg) >= 3)
 			{
 				h = StrIndex(msg, 0) - 1;
 				v = StrIndex(msg, 1) - 1;
-
-			}			
-			//NumOut(0, LCD_LINE2, h);
-			//NumOut(0, LCD_LINE3, v);
-			Acquire(mut_cmd);
+				shoot = StrIndex(msg, 2) - 1;
+			}
+			Acquire(mut_cmd);	//Acquire mutex to avoid problem with the aim task
 			t_left = (v+h)/2;
 			t_right = (v-h)/2;
-			Release(mut_cmd);
+			Release(mut_cmd);	//Release mutex
 			
-			dt_cmd = ct;
+			pt_cmd = ct;
 		}
 
-		if((ct - dt_hk) >= 250)
-		{
-			Acquire(mut_hk);
-			hk[3] = MotorTachoCount(OUT_A);
-			hk[2] = MotorTachoCount(OUT_C);
-			hk[1] = bullets;
-			hk[0] = BatteryLevel();
-			msg = ByteArrayToStr(hk);
-			err = SendMessage(MAILBOX2, msg);
-			//handle error
-			Release(mut_hk);
-			dt_hk = ct;
-		}
+		//if((ct - pt_hk) >= 250)
+		//{
+			//hk[3] = MotorTachoCount(OUT_A);
+			//hk[2] = MotorTachoCount(OUT_C);
+			//hk[1] = bullets;
+			//hk[0] = BatteryLevel();
+			
+			//msg = ByteArrayToStr(hk);
+			//err = SendMessage(MAILBOX2, msg);
+			//TODO Handle error
+			
+			//pt_hk = ct;
+		//}
 	}
 }
+
+/**
+ * Task which process the aim control.
+ * Use an incremental serie PID
+ * The PID is designed for a 10ms loop
+ */
 
 task aim()
 {
 	//Init
-	long ct;
-	long pt;
-	long t;
+	long ct;			//Current tick
+	long pt;			//Previous tick
+
+	char i_left[3];		//Input of the left PID
+	char i_right[3];	//Input of the right PID
+	char o_left[2];		//Output of the left PID
+	char o_right[2];	//Output of the right PID
+	
+	char p_left;
+	char p_right;
+	//Init PID
 	i_left[2] = 0;
 	i_left[1] = 0;
 	i_right[2] = 0;
@@ -124,50 +171,109 @@ task aim()
 		{
 			pt = ct;
 			
-			Acquire(mut_cmd);
+			Acquire(mut_cmd);	//Acquire mutex to avoid problem with the comm task
+			//Compute new input for the PID
 			i_left[0] = t_left - MotorTachoCount(OUT_A);
 			i_right[0] = t_right - MotorTachoCount(OUT_C);
-			Release(mut_cmd);
-
-			p_left = 11.6227*i_left[2] - 26.3344*i_left[1] + 14.9039*i_left[0] - 0.4302*o_left[1] + 1.4302*o_left[0];
-			p_right = 11.6227*i_right[2] - 26.3344*i_right[1] + 14.9039*i_right[0] - 0.4302*o_right[1] + 1.4302*o_right[0];
+			Release(mut_cmd);	//Release mutex
 			
-			if(p_left > 100)
-				p_left = 100;
+			//Compute the PID
+			o_left[0] = 11.6227*i_left[2] - 26.3344*i_left[1] + 14.9039*i_left[0] - 0.4302*o_left[1] + 1.4302*o_left[0];
+			o_right[0] = 11.6227*i_right[2] - 26.3344*i_right[1] + 14.9039*i_right[0] - 0.4302*o_right[1] + 1.4302*o_right[0];
+			
+			//Check for PID saturation
+			if(o_left[0] > 100)
+				o_left[0] = 100;
+			if(o_left[0] < -100)
+				o_left[0] = -100;
 
-			if(p_left < -100)
-				p_left = -100;
-
-			if(p_right > 100)
-				p_right = 100;
-
+			if(o_right[0] > 100)
+				o_right[0] = 100;
 			if(p_right < -100)
-				p_right = -100;
+				o_right[0] = -100;
+			
+			//Set the new motor power
+			OnFwdEx(OUT_A, o_left[0], 0x00);
+			OnFwdEx(OUT_C, o_right[0], 0x00);
 
-			OnFwdEx(OUT_A, p_left, 0x00);
-			OnFwdEx(OUT_C, p_right, 0x00);
-
+			//Memorize previous value
 			i_left[2] = i_left[1];
 			i_left[1] = i_left[0];
 			o_left[1] = o_left[0];
-			o_left[0] = p_left;
 		
 			i_right[2] = i_right[1];
 			i_right[1] = i_right[0];
 			o_right[1] = o_right[0];
-			o_right[0] = p_right;
 		}
-		//NumOut(0, LCD_LINE5, p_left);
-		//NumOut(0, LCD_LINE4, p_right);
 	}
 }
 
+/**
+ * Task which process the shoot.
+ */
+task  fire()
+{
+	//init
+	long ct;
+	long pt;
+	
+	long target = 0;
+	long i_shoot[3];
+	long o_shoot[2];
+	
+	i_shoot[2] = 0;
+	i_shoot[1] = 0;
+	o_shoot[1] = 0;
+	o_shoot[0] = 0;
+	
+	ResetTachoCount(OUT_B);
+	
+	pt = CurrentTick();
+		
+	//loop
+	while(true)
+	{
+		if(shoot != 0)
+		{
+			target = MotorTachoCount(OUT_B) + 360;
+			shoot = 0;
+			bullets--;
+		}
+		
+		ct = CurrentTick();
+		
+		if((ct - pt) >= 10)
+		{
+			pt = ct;
+			
+			i_shoot[0] = target - MotorTachoCount(OUT_B);
+			
+			o_shoot[0] = 11.6227*i_shoot[2] - 26.3344*i_shoot[1] + 14.9039*i_shoot[0] - 0.4302*o_shoot[1] + 1.4302*o_shoot[0];
+			
+			if(o_shoot[0] > 100)
+				o_shoot[0] = 100;
+			if(o_shoot[0] < -100)
+				o_shoot[0] = -100;
+			
+			OnFwdEx(OUT_B, o_shoot[0], 0x00);
+			
+			i_shoot[2] = i_shoot[1];
+			i_shoot[1] = i_shoot[0];
+			o_shoot[1] = o_shoot[0];
+		}
+			
+	}
+}
+
+
+/**
+ * Task which supervise all others tasks.
+ */
 task manager()
 {
 	//init
 
-
-	//manager loop
+	//loop
 	while(true)
 	{
 		if(ButtonPressed(BTNCENTER, false))
@@ -177,7 +283,11 @@ task manager()
 	}
 }
 
+/**
+ * Main task which launch other tasks
+ */
 task main()
 {
- 	Precedes(manager, comm, aim);
+	calibrate();
+ 	Precedes(manager, comm, aim, fire);
 }
