@@ -44,7 +44,7 @@ void calibrate()
 	{
 		pos = MotorTachoCount(OUT_A);
 		Wait(50);
-		pos -= MotorTachoCount(OUT_A);	
+		pos -= MotorTachoCount(OUT_A);
 	}while(pos != 0);
 	OnFwdEx(OUT_A, 0, 0x00);
 	ResetTachoCount(OUT_A);
@@ -54,7 +54,7 @@ void calibrate()
 	{
 		pos = MotorTachoCount(OUT_C);
 		Wait(50);
-		pos -= MotorTachoCount(OUT_C);	
+		pos -= MotorTachoCount(OUT_C);
 	}while(pos != 0);
 	OnFwdEx(OUT_C, 0, 0x00);
 	ResetTachoCount(OUT_C);
@@ -87,7 +87,7 @@ task comm()
 	long pt_hk;		//Previous tick for housekeeping
 	string msg;		//String from the command mailbox
 	char err;		//Error handling variable
-	
+
 	pt_cmd = CurrentTick();
 	pt_hk = pt_cmd;
 
@@ -103,12 +103,13 @@ task comm()
 				h = StrIndex(msg, 0) - 1;
 				v = StrIndex(msg, 1) - 1;
 				shoot = StrIndex(msg, 2) - 1;
+        PlayTone(440, 500);
 			}
 			Acquire(mut_cmd);	//Acquire mutex to avoid problem with the aim task
 			t_left = (v+h)/2;
 			t_right = (v-h)/2;
 			Release(mut_cmd);	//Release mutex
-			
+
 			pt_cmd = ct;
 		}
 
@@ -118,11 +119,11 @@ task comm()
 			//hk[2] = MotorTachoCount(OUT_C);
 			//hk[1] = bullets;
 			//hk[0] = BatteryLevel();
-			
+
 			//msg = ByteArrayToStr(hk);
 			//err = SendMessage(MAILBOX2, msg);
 			//TODO Handle error
-			
+
 			//pt_hk = ct;
 		//}
 	}
@@ -144,7 +145,7 @@ task aim()
 	char i_right[3];	//Input of the right PID
 	char o_left[2];		//Output of the left PID
 	char o_right[2];	//Output of the right PID
-	
+
 	char p_left;
 	char p_right;
 	//Init PID
@@ -170,17 +171,17 @@ task aim()
 		if((ct - pt) >= 10)
 		{
 			pt = ct;
-			
+
 			Acquire(mut_cmd);	//Acquire mutex to avoid problem with the comm task
 			//Compute new input for the PID
 			i_left[0] = t_left - MotorTachoCount(OUT_A);
 			i_right[0] = t_right - MotorTachoCount(OUT_C);
 			Release(mut_cmd);	//Release mutex
-			
+
 			//Compute the PID
 			o_left[0] = 11.6227*i_left[2] - 26.3344*i_left[1] + 14.9039*i_left[0] - 0.4302*o_left[1] + 1.4302*o_left[0];
 			o_right[0] = 11.6227*i_right[2] - 26.3344*i_right[1] + 14.9039*i_right[0] - 0.4302*o_right[1] + 1.4302*o_right[0];
-			
+
 			//Check for PID saturation
 			if(o_left[0] > 100)
 				o_left[0] = 100;
@@ -191,7 +192,7 @@ task aim()
 				o_right[0] = 100;
 			if(p_right < -100)
 				o_right[0] = -100;
-			
+
 			//Set the new motor power
 			OnFwdEx(OUT_A, o_left[0], 0x00);
 			OnFwdEx(OUT_C, o_right[0], 0x00);
@@ -200,7 +201,7 @@ task aim()
 			i_left[2] = i_left[1];
 			i_left[1] = i_left[0];
 			o_left[1] = o_left[0];
-		
+
 			i_right[2] = i_right[1];
 			i_right[1] = i_right[0];
 			o_right[1] = o_right[0];
@@ -216,20 +217,20 @@ task  fire()
 	//init
 	long ct;
 	long pt;
-	
+
 	long target = 0;
 	long i_shoot[3];
 	long o_shoot[2];
-	
+
 	i_shoot[2] = 0;
 	i_shoot[1] = 0;
 	o_shoot[1] = 0;
 	o_shoot[0] = 0;
-	
+
 	ResetTachoCount(OUT_B);
-	
+
 	pt = CurrentTick();
-		
+
 	//loop
 	while(true)
 	{
@@ -239,29 +240,29 @@ task  fire()
 			shoot = 0;
 			bullets--;
 		}
-		
+
 		ct = CurrentTick();
-		
+
 		if((ct - pt) >= 10)
 		{
 			pt = ct;
-			
+
 			i_shoot[0] = target - MotorTachoCount(OUT_B);
-			
+
 			o_shoot[0] = 11.6227*i_shoot[2] - 26.3344*i_shoot[1] + 14.9039*i_shoot[0] - 0.4302*o_shoot[1] + 1.4302*o_shoot[0];
-			
+
 			if(o_shoot[0] > 100)
 				o_shoot[0] = 100;
 			if(o_shoot[0] < -100)
 				o_shoot[0] = -100;
-			
+
 			OnFwdEx(OUT_B, o_shoot[0], 0x00);
-			
+
 			i_shoot[2] = i_shoot[1];
 			i_shoot[1] = i_shoot[0];
 			o_shoot[1] = o_shoot[0];
 		}
-			
+
 	}
 }
 

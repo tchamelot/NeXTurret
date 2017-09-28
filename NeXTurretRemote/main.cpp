@@ -48,19 +48,28 @@ void gotoxy(int x, int y)
 	cout << "\x1b[" << y << ';' << x << 'f' <<  flush;
 }
 
+void printRules()
+{
+	cout << "Bienvenue sur la télécommande de la tourelle lego" << endl;
+	cout << "Utilise les flèches dirrectionnelles pour la diriger" << endl;
+	cout << "Appuies sur espace pour tirer" << endl;
+	cout << "Utilises \"Q\" pour quitter le programme" << endl;
+}
+
 int main(int argc, char* argv[])
 {
 	NXT nxt(false);
-	char cmd[3];
+	char cmd[4];
 	char c;
 	char v = 0;	//Vertical target position
 	char h = 0;	//Horizontal target position
 	//string cmd;
 	string hk; 	//Housekeeping
 	char raw_hk[4];
-	
+
 	//Clear screen
 	clear();
+	printRules();
 
 	//Ensure that the turret is connected
 	if(!nxt.find_nxt())
@@ -68,7 +77,7 @@ int main(int argc, char* argv[])
 		cerr << "Turret not connected" << endl;
 		cerr << "Leaving NeXTurret Remote" << endl;
 		exit(EXIT_FAILURE);
-	}	
+	}
 	else
 	{
 		nxt.open();
@@ -88,27 +97,27 @@ int main(int argc, char* argv[])
 
 				switch(c)
 				{
-					//UP
+					//UP A
 					case 'A':
-						v+=2;
+						v+=10;
 						if(v > 100)
 							v = 100;
 						break;
-					//DOWN
+					//DOWN B
 					case 'B':
-						v-=2;
+						v-=10;
 						if(v < -100)
 							v = -100;
 						break;
-					//RIGHT
+					//RIGHT C
 					case 'C':
-						h+=2;
+						h+=10;
 						if(h > 100)
 							h = 100;
 						break;
-					//LEFT
+					//LEFT D
 					case 'D':
-						h-=2;
+						h-=10;
 						if(h < -100)
 							h = -100;
 						break;
@@ -122,9 +131,21 @@ int main(int argc, char* argv[])
 
 				cmd[0] = h;
 				cmd[1] = v;
-				cmd[2] = 0;
+				cmd[2] = 1;
+				cmd[3] = 0;
 				nxt.mailbox_send(string(cmd), 0);
 			}
+
+			if(c == ' ')
+			{
+				cmd[0] = h;
+				cmd[1] = v;
+				cmd[2] = 2;
+				cmd[3] = 0;
+				nxt.mailbox_send(string(cmd), 0);
+			}
+			clear();
+			printRules();
 		}
 
 		if(nxt.mailbox_read(hk, 1) == 0)

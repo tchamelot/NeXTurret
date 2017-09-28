@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	android:orientation="vertical" android:layout_width="fill_parent"
+	android:layout_height="fill_parent">
+
+
+	<LinearLayout android:id="@+id/LinearLayout02"
+		android:layout_height="wrap_content" android:layout_width="fill_parent"
+		android:gravity="center" android:layout_margin="5dp">
+		<org.tchamelot.NeXTRemote.SquareImageButton
+			android:id="@+id/button_left" android:layout_width="wrap_content"
+			android:layout_height="wrap_content" android:layout_weight="1"
+			android:layout_gravity="bottom" android:src="@drawable/left_arrow"></org.tchamelot.NeXTRemote.SquareImageButton>
+		<LinearLayout android:id="@+id/LinearLayout04"
+			android:layout_width="wrap_content" android:layout_height="wrap_content"
+			android:layout_weight="1" android:orientation="vertical">
+			<org.tchamelot.NeXTRemote.SquareImageButton
+				android:id="@+id/button_up" android:layout_width="wrap_content"
+				android:layout_height="wrap_content" android:src="@drawable/up_arrow"></org.tchamelot.NeXTRemote.SquareImageButton>
+			<org.tchamelot.NeXTRemote.SquareImageButton
+				android:id="@+id/button_down" android:layout_width="wrap_content"
+				android:layout_height="wrap_content" android:layout_weight="1"
+				android:src="@drawable/down_arrow"></org.tchamelot.NeXTRemote.SquareImageButton>
+		</LinearLayout>
+		<org.tchamelot.NeXTRemote.SquareImageButton
+			android:id="@+id/button_right" android:layout_width="wrap_content"
+			android:layout_height="wrap_content" android:layout_weight="1"
+			android:layout_gravity="bottom" android:src="@drawable/right_arrow"></org.tchamelot.NeXTRemote.SquareImageButton>
+
+
+	</LinearLayout>
+
+	<LinearLayout android:id="@+id/LinearLayout01"
+		android:layout_height="wrap_content" android:layout_width="fill_parent"
+		android:layout_weight="2">
+		<Button
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_gravity="center"
+			android:text="SHOOT"
+			android:id="@+id/shoot" />
+	</LinearLayout>
+
+
+	<LinearLayout android:id="@+id/LinearLayout03"
+		android:layout_height="wrap_content" android:orientation="horizontal"
+		android:layout_width="fill_parent">
+		<TextView android:layout_width="fill_parent" android:id="@+id/state_display"
+			android:textSize="28sp" android:layout_weight="1" android:text="Not connected"
+			android:gravity="center" android:layout_height="fill_parent"
+			android:textStyle="bold"></TextView>
+
+		<Button android:layout_width="wrap_content"
+			android:layout_height="wrap_content" android:layout_gravity="center"
+			android:id="@+id/connect_button" android:text="Connect"
+			android:paddingLeft="20dp" android:paddingRight="20dp"></Button>
+		<Button android:text="Disconnect" android:id="@+id/disconnect_button"
+			android:layout_width="wrap_content" android:layout_height="wrap_content"
+			android:layout_gravity="center" android:paddingLeft="20dp"
+			android:paddingRight="20dp" android:visibility="gone"></Button>
+
+	</LinearLayout>
+
+
+
+
+
+
+
+
+
+
+</LinearLayout>
